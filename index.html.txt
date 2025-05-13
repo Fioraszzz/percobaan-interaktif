@@ -1,0 +1,253 @@
+
+The requirement now is: When the first "keluar" button is pressed, the screen fades to black, and after that the web restarts from the first slide (does not close the webpage). So the difference from the previous implementation is instead of closing the web after fade to black, it resets to the beginning.
+
+I will keep the fade-out black overlay and after the transition delay, hide the overlay and reset the slide to slide 1 so that the quiz restarts visually.
+
+I will implement this logic in the closeWindow function, but rename it to something like fadeToBlackAndRestart to better reflect what it does now.
+
+After pressing keluar on slide 1:
+- Show black overlay with fade
+- After fade delay:
+  - Hide black overlay
+  - Show slide 1
+
+All other behavior remains the same.
+
+I will now create the full updated single HTML file considering this.
+
+Also need to make sure the black overlay covers everything and user cannot interact while it's active.
+
+This will satisfy the user request to have the screen fade black on keluar then restart from beginning.
+
+
+
+`interactive-quiz.html`
+```html
+<!DOCTYPE html>
+<html lang="id">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no" />
+<title>Interactive Quiz</title>
+<style>
+  /* Reset and base */
+  * {
+    box-sizing: border-box;
+  }
+  html, body {
+    margin: 0;
+    padding: 0;
+    background-color: #fff;
+    font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+    height: 100vh;
+    overflow: hidden;
+    color: #222;
+    position: relative;
+  }
+  body {
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    min-height: 600px;
+    max-width: 350px;
+    margin: 0 auto;
+    padding: 20px;
+  }
+  #app {
+    width: 100%;
+    max-width: 350px;
+    height: 600px;
+    border-radius: 12px;
+    box-shadow: 0 6px 20px rgb(0 0 0 / 0.1);
+    background-color: #fff;
+    display: flex;
+    flex-direction: column;
+    justify-content: center;
+    align-items: center;
+    padding: 20px;
+    user-select: none;
+    position: relative;
+    z-index: 1;
+  }
+  .slide {
+    display: none;
+    width: 100%;
+    text-align: center;
+  }
+  .slide.active {
+    display: block;
+  }
+  h2 {
+    margin-bottom: 24px;
+    font-weight: 700;
+    font-size: 1.8rem;
+    line-height: 1.2;
+  }
+  button {
+    display: block;
+    width: 80%;
+    max-width: 280px;
+    margin: 12px auto;
+    padding: 14px 0;
+    font-size: 1.2rem;
+    font-weight: 600;
+    color: #fff;
+    background: linear-gradient(45deg, #4a90e2, #357ABD);
+    border: none;
+    border-radius: 10px;
+    cursor: pointer;
+    transition: background 0.3s ease;
+    box-shadow: 0 4px 10px rgb(53 122 189 / 0.4);
+  }
+  button:hover, button:focus {
+    background: linear-gradient(45deg, #357ABD, #2a5b8c);
+    outline: none;
+  }
+  button.keluar {
+    background: linear-gradient(45deg, #e24a4a, #b93535);
+    box-shadow: 0 4px 10px rgb(185 53 53 / 0.6);
+  }
+  button.keluar:hover, button.keluar:focus {
+    background: linear-gradient(45deg, #b93535, #852727);
+  }
+  p.message {
+    font-size: 1.4rem;
+    font-weight: 600;
+    color: #333;
+    margin-bottom: 28px;
+  }
+
+  /* Black overlay for fade effect */
+  #black-overlay {
+    position: fixed;
+    top: 0;
+    left: 0;
+    width: 100vw;
+    height: 100vh;
+    background: black;
+    opacity: 0;
+    pointer-events: none;
+    transition: opacity 0.6s ease;
+    z-index: 9999;
+  }
+  #black-overlay.active {
+    opacity: 1;
+    pointer-events: auto;
+  }
+
+  @media (max-width: 400px) {
+    body {
+      padding: 10px;
+    }
+    #app {
+      width: 100%;
+      height: 100%;
+      max-width: 100%;
+      border-radius: 0;
+      padding: 15px;
+    }
+    button {
+      font-size: 1.1rem;
+      padding: 12px 0;
+      max-width: 100%;
+      width: 100%;
+      margin: 10px 0;
+    }
+    h2 {
+      font-size: 1.5rem;
+      margin-bottom: 20px;
+    }
+  }
+</style>
+</head>
+<body>
+  <div id="app" role="main" aria-live="polite">
+    <!-- Slide 1 -->
+    <section id="slide1" class="slide active" aria-label="Pilihan pertama">
+      <h2>Pilih aksi:</h2>
+      <button class="keluar" id="btnKeluar1" type="button" aria-label="Keluar dari halaman">Keluar</button>
+      <button id="btnLanjut1" type="button" aria-label="Lanjut ke pilihan berikutnya">Lanjut</button>
+    </section>
+
+    <!-- Slide 2 -->
+    <section id="slide2" class="slide" aria-label="Pertanyaan kuis">
+      <h2>1+1 = ?</h2>
+      <button class="answer-btn" data-answer="1" type="button" aria-label="Jawaban 1">1</button>
+      <button class="answer-btn" data-answer="2" type="button" aria-label="Jawaban 2">2</button>
+      <button class="answer-btn" data-answer="3" type="button" aria-label="Jawaban 3">3</button>
+      <button class="answer-btn" data-answer="4" type="button" aria-label="Jawaban 4">4</button>
+    </section>
+
+    <!-- Slide 3 -->
+    <section id="slide3" class="slide" aria-label="Hasil kuis">
+      <p id="resultMessage" class="message"></p>
+      <button id="finalButton" type="button"></button>
+    </section>
+  </div>
+
+  <div id="black-overlay" aria-hidden="true"></div>
+
+  <script>
+    (function(){
+      const slide1 = document.getElementById('slide1');
+      const slide2 = document.getElementById('slide2');
+      const slide3 = document.getElementById('slide3');
+      const btnKeluar1 = document.getElementById('btnKeluar1');
+      const btnLanjut1 = document.getElementById('btnLanjut1');
+      const answerButtons = slide2.querySelectorAll('.answer-btn');
+      const resultMessage = document.getElementById('resultMessage');
+      const finalButton = document.getElementById('finalButton');
+      const blackOverlay = document.getElementById('black-overlay');
+
+      function showSlide(n) {
+        [slide1, slide2, slide3].forEach(s => s.classList.remove('active'));
+        n.classList.add('active');
+      }
+
+      function fadeToBlackAndRestart() {
+        blackOverlay.classList.add('active');
+        setTimeout(() => {
+          blackOverlay.classList.remove('active');
+          showSlide(slide1);
+        }, 600); // match fade transition duration
+      }
+
+      btnKeluar1.addEventListener('click', () => {
+        fadeToBlackAndRestart();
+      });
+
+      btnLanjut1.addEventListener('click', () => {
+        showSlide(slide2);
+      });
+
+      answerButtons.forEach(button => {
+        button.addEventListener('click', () => {
+          const answer = button.getAttribute('data-answer');
+          if(answer === '2'){
+            // Correct answer
+            resultMessage.textContent = '';
+            finalButton.textContent = 'Percobaan Selesai';
+            finalButton.classList.remove('keluar');
+            finalButton.setAttribute('aria-label', 'Percobaan selesai, ulangi kuis');
+            finalButton.onclick = () => {
+              showSlide(slide1);
+            };
+          } else {
+            // Wrong answer
+            resultMessage.textContent = 'yaah gitu doang salah, wkwkwkwk';
+            finalButton.textContent = 'Keluar';
+            finalButton.classList.add('keluar');
+            finalButton.setAttribute('aria-label', 'Ulangi kuis dari awal');
+            finalButton.onclick = () => {
+              showSlide(slide1);
+            };
+          }
+          showSlide(slide3);
+        });
+      });
+    })();
+  </script>
+</body>
+</html>
+
+```
